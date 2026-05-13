@@ -72,12 +72,61 @@ moeda_img = pygame.transform.scale(moeda_img, (70,70))
 plat3_img = pygame.transform.scale(plat3_img, (largura, altura))
 
 # Define hitbox específico para cada imagem
-HITBOX_OFFSETS = {id(rua_img): (5, 220, 20),id(plat1_img): (5 , 220, 580),id(plat2_img): (270, 220, 540),id(plat3_img): (580, 220, 585),
-}
+HITBOX_OFFSETS = {id(rua_img): (5, 220, 20),id(plat1_img): (5 , 220, 580),id(plat2_img): (270, 220, 540),id(plat3_img): (580, 220, 585),}
 
 #Criando conjuntos de possíveis plataformas + posição plataforma (500)
 PLAT = [rua_img,plat1_img,plat2_img,plat3_img]
 chao = HEIGHT -400
+
+tempo_pulo_max = 15
+VEL_PULO = -20
+GRAVIDADE = 1
+
+def calcular_tempo_no_ar():
+    y = 0
+    vy = 0
+    tempo_pulo = tempo_pulo_max
+    pulando = True
+    frames = 0
+
+    while True:
+        frames += 1
+
+        if pulando and tempo_pulo > 0:
+            vy = VEL_PULO
+            tempo_pulo -= 1
+
+        vy += GRAVIDADE
+        y += vy
+
+        if tempo_pulo == 0:
+            pulando = False
+
+        if y >= 0 and frames > 1:
+            return frames
+
+TEMPO_NO_AR_MAX = calcular_tempo_no_ar()
+
+
+def calcular_gap_seguro(plat_anterior):
+    velocidade = abs(velocidade_mundo)
+
+    if plat_anterior.image is plat3_img:
+        base_min, base_max = 160, 200
+    elif plat_anterior.image is plat2_img:
+        base_min, base_max = 130, 170
+    elif plat_anterior.image is plat1_img:
+        base_min, base_max = 140, 170
+    else:  # rua_img
+        base_min, base_max = 150, 190
+
+    # aumenta o gap conforme a velocidade do jogo aumenta
+    bonus = max(0, (velocidade - 4) * 9)
+
+    gap_min = base_min + bonus
+    gap_max = base_max + bonus
+
+    return random.randint(gap_min, gap_max)
 
 # Conteúdo quantidade
 coins = 0 
@@ -125,21 +174,32 @@ while inicio_jogo:
 
 #===== Classe plataformas =====
 class Plataforma (pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, imagem=None):
         pygame.sprite.Sprite.__init__(self)
-        self.image = random.choice(PLAT) # sortear aleatoriamente uma das 4 plataformas
+        self.image = imagem if imagem is not None else random.choice(PLAT) # sortear aleatoriamente uma das 4 plataformas
         self.rect = self.image.get_rect() # cria um retângulo de plataforma (colisão)
         self.rect.x = x #posição x da plataforma
         self.rect.y = y #posição y da plataforma
 
         margem_esq, offset_y, corte = HITBOX_OFFSETS[id(self.image)]
         self.hitbox = pygame.Rect(x + margem_esq, y + offset_y, self.rect.width - corte, 50)
+
             
     def update (self):
         self.rect.x += velocidade_mundo #mover a plataforma para a esquerda
         self.hitbox.x += velocidade_mundo
         if self.rect.right < 0: # se a imagem sair da tela, a remove
             self.kill()
+
+def criar_proxima_plataforma(plat_anterior):
+    imagem = random.choices(PLAT, weights=[5, 1, 1, 1], k=1)[0]
+    margem_esq, offset_y, corte = HITBOX_OFFSETS[id(imagem)]
+
+
+    gap = calcular_gap_seguro(plat_anterior)
+
+    x = plat_anterior.hitbox.right + gap - margem_esq
+    return Plataforma(x, chao, imagem)
 
 #===== Classe jogador =====
 class Jogador (pygame.sprite.Sprite):
@@ -216,12 +276,15 @@ plat_inicial.hitbox = pygame.Rect(0, chao + 220, largura, 50)
 todos_sprites.add(plat_inicial)
 plataformas.add(plat_inicial)
 
-x = largura
-while x < WIDTH + 200: #Criar plataformas na esquerda até ultrapassar a tela
-    plat = Plataforma(x, chao)
+ultima_plat = plat_inicial
+x_final = plat_inicial.hitbox.right
+
+while x_final < WIDTH + 200:
+    plat = criar_proxima_plataforma(ultima_plat)
     todos_sprites.add(plat)
     plataformas.add(plat)
-    x += plat.rect.width + random.randint(20,30)
+    ultima_plat = plat
+    x_final = plat.hitbox.right
 
 # ===== Loop principal =====
 while game:
@@ -269,7 +332,19 @@ while game:
     background_rect2.x += background_rect2.width
     window.blit(background, background_rect2)
 
-    # Desenha as placas se movendo
+# Gera novas plataformas pela direita
+    plats_visiveis = [p for p in plataformas if p.rect.right > 0]
+    while not plats_visiveis or max(p.rect.right for p in plats_visiveis) < WIDTH:
+        ultima_plat = max(plats_visiveis, key=lambda p: p.hitbox.right) if plats_visiveis else None
+        if ultima_plat:
+            nova_plat = criar_proxima_plataforma(ultima_plat)
+        else:
+            nova_plat = Plataforma(WIDTH, chao, random.choice(PLAT))
+        todos_sprites.add(nova_plat)
+        plataformas.add(nova_plat)
+        plats_visiveis = [p for p in plataformas if p.rect.right > 0]
+
+# Desenha as placas se movendo
     window.blit(placas_img, placas_rect)
     placas_rect2 = placas_rect.copy()
     placas_rect2.x += placas_rect2.width
