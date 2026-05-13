@@ -13,7 +13,7 @@ FPS = 60
 
 # Aumentando a velocidade do mapa conforme o tempo
 timer_velocidade = 0
-velocidade_max = -50
+velocidade_max = -35 
 velocidade_mundo = -4
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -30,6 +30,10 @@ amarelo = (255,255,0)
 azul = (100,149,237)
 cinza = (80,80,80)
 
+# tamanhos de cada uma das platadormas
+altura = 400
+largura = 800
+
 # Carrega imagens
 inicio_img = pygame.image.load("assets/img/capa.png").convert()
 inicio_img = pygame.transform.scale(inicio_img, (WIDTH, HEIGHT))
@@ -39,16 +43,25 @@ background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 background_rect = background.get_rect()
 
 rua_img = pygame.image.load("assets/img/estrada.png").convert_alpha()
-rua_img = pygame.transform.scale(rua_img, (WIDTH, HEIGHT))
-rua_rect = rua_img.get_rect()
+rua_img = pygame.transform.scale(rua_img, (largura, altura))
+
+plat1_img = pygame.image.load("assets/img/plat5.png").convert_alpha()
+plat1_img = pygame.transform.scale(plat1_img, (largura, altura))
+
+plat2_img = pygame.image.load("assets/img/plat6.png").convert_alpha()
+plat2_img = pygame.transform.scale(plat2_img, (largura, altura))
+
+plat3_img = pygame.image.load("assets/img/plat7.png").convert_alpha()
+plat3_img = pygame.transform.scale(plat3_img, (largura, altura))
 
 placas_img = pygame.image.load("assets/img/placas.png").convert_alpha()
 placas_img = pygame.transform.scale(placas_img, (WIDTH-100, HEIGHT-100))
 placas_rect = placas_img.get_rect()
+placas_rect.x = 0
+placas_rect.y = 130
 
 zombie_img = pygame.image.load("assets/img/zombie.png").convert_alpha()
 zombie_img = pygame.transform.scale(zombie_img, (80, 100))
-
 
 mao_img = pygame.image.load("assets/img/mao.png").convert_alpha()
 mao_img = pygame.transform.scale(mao_img, (200,200))
@@ -56,8 +69,18 @@ mao_img = pygame.transform.scale(mao_img, (200,200))
 moeda_img = pygame.image.load("assets/img/moeda.png").convert_alpha()
 moeda_img = pygame.transform.scale(moeda_img, (70,70))
 
+plat3_img = pygame.transform.scale(plat3_img, (largura, altura))
+
+# Define hitbox específico para cada imagem
+HITBOX_OFFSETS = {id(rua_img): (5, 220, 20),id(plat1_img): (5 , 220, 580),id(plat2_img): (270, 220, 540),id(plat3_img): (580, 220, 585),
+}
+
+#Criando conjuntos de possíveis plataformas + posição plataforma (500)
+PLAT = [rua_img,plat1_img,plat2_img,plat3_img]
+chao = HEIGHT -400
+
 # Conteúdo quantidade
-coins = 0
+coins = 0 
 zombie_count = 1
 
 # ===== Tela de início =====
@@ -100,44 +123,105 @@ while inicio_jogo:
 
     pygame.display.update()
 
+#===== Classe plataformas =====
+class Plataforma (pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = random.choice(PLAT) # sortear aleatoriamente uma das 4 plataformas
+        self.rect = self.image.get_rect() # cria um retângulo de plataforma (colisão)
+        self.rect.x = x #posição x da plataforma
+        self.rect.y = y #posição y da plataforma
+
+        margem_esq, offset_y, corte = HITBOX_OFFSETS[id(self.image)]
+        self.hitbox = pygame.Rect(x + margem_esq, y + offset_y, self.rect.width - corte, 50)
+            
+    def update (self):
+        self.rect.x += velocidade_mundo #mover a plataforma para a esquerda
+        self.hitbox.x += velocidade_mundo
+        if self.rect.right < 0: # se a imagem sair da tela, a remove
+            self.kill()
+
 #===== Classe jogador =====
 class Jogador (pygame.sprite.Sprite):
     def __init__(self):
     # Construtor da classe mãe (Sprite).
         pygame.sprite.Sprite.__init__(self)
 
-#imagem Jogador/zombie
+        #imagem Jogador/zombie
         self.image = zombie_img
         self.rect = self.image.get_rect()
 
+        self.pulando = False # botão espaço sendo segurado
+        self.tempo_pulo = 0 # frames restantes do pulo
+        self.tempo_pulo_max = 15  # frames máximos segurando o espaço
+
         # Posição inicial
-        self.rect.x = 150
-        self.rect.bottom = HEIGHT - 125 # ficar em cima do chão
+        self.rect.x = 150 #posiciona o jogador x =150
+        self.rect.bottom = 720 # ficar em cima do chão
 
         # Pulo
-        self.velocidade_y = 0
-        self.chao = True
+        self.velocidade_y = 0 
+        self.chao = True #permitir pular
 
-    def update(self):
-        # Gravidade
-        self.velocidade_y += 1
-        self.rect.y += self.velocidade_y
-        
-        # Chão
-        if self.rect.bottom >= HEIGHT-125:
-            self.rect.bottom = HEIGHT - 125
-            self.velocidade_y = 0
-            self.chao = True
-        
-    def pular (self):
-        if self.chao:
+    def update(self,plataformas):
+        # Pulo longo baseado no tempo segurando
+        if self.pulando and self.tempo_pulo > 0: # enquanto o espaço está sendo segurado e ainda tem tempo de pulo, manter a velicodade subindo
             self.velocidade_y = -20
-            self.chao = False
+            self.tempo_pulo -= 1
+
+        # Gravidade
+        self.velocidade_y += 1 
+        self.rect.y += self.velocidade_y # aplicar a gravidade - mover verticalmente jogador
+        
+        # Colisão com plataformas
+        self.chao = False
+        for plat in plataformas:
+            if self.rect.colliderect(plat.hitbox):
+                if self.velocidade_y > 0:
+                    self.rect.bottom = plat.hitbox.top
+                    self.velocidade_y = 0
+                    self.chao = True
+
+        # Morreu ao cair no buraco
+        if self.rect.top > HEIGHT:
+            return True  # game over
+
+        return False
+        
+    def pular(self):  # chamado quando APERTA o espaço
+        if self.chao: # só pula se estiver no chão
+            self.pulando = True
+            self.tempo_pulo = self.tempo_pulo_max
+            self.chao = False 
+
+    def soltar_pulo(self):  # chamado quando SOLTA o espaço
+        self.pulando = False # desativar o pulo
+        self.tempo_pulo = 0
 
 # Criar jogador + grupo sprites
 player = Jogador()
 todos_sprites = pygame.sprite.Group()
+plataformas = pygame.sprite.Group()
 todos_sprites.add(player)
+
+# Criação plataformas iniciais
+
+# Força plataforma longa no início
+plat_inicial = Plataforma(0, chao)
+plat_inicial.image = rua_img
+plat_inicial.rect = plat_inicial.image.get_rect()
+plat_inicial.rect.x = 0
+plat_inicial.rect.y = chao
+plat_inicial.hitbox = pygame.Rect(0, chao + 220, largura, 50)
+todos_sprites.add(plat_inicial)
+plataformas.add(plat_inicial)
+
+x = largura
+while x < WIDTH + 200: #Criar plataformas na esquerda até ultrapassar a tela
+    plat = Plataforma(x, chao)
+    todos_sprites.add(plat)
+    plataformas.add(plat)
+    x += plat.rect.width + random.randint(20,30)
 
 # ===== Loop principal =====
 while game:
@@ -151,10 +235,19 @@ while game:
             if event.key == pygame.K_SPACE:
                 player.pular()
 
+        if event.type == pygame.KEYUP:  # quando SOLTA a tecla
+            if event.key == pygame.K_SPACE:
+                player.soltar_pulo()
+
     # Move o background
     background_rect.x += velocidade_mundo
-    if background_rect.right < 0:
+    if background_rect.right < 0: # se sair da tela, volta para o início
         background_rect.x = 0
+
+    #Move as placasa igual ao background
+    placas_rect.x += velocidade_mundo 
+    if placas_rect.right < 0:
+        placas_rect.x = 0 
     
     #Aumentando a velocidade do mapa a cada 10 segundos (10*60 = 600 frames)
     timer_velocidade +=1
@@ -163,8 +256,11 @@ while game:
         if timer_velocidade> velocidade_max:
             velocidade_mundo -= 1
 
-    # Atualizando sprites
-    todos_sprites.update()
+    # Atualiza jogador e plataformas
+    game_over = player.update(plataformas)
+    if game_over:
+        game = False
+    plataformas.update()
 
     # Desenha o fundo duas vezes
     window.fill(preto)
@@ -173,13 +269,20 @@ while game:
     background_rect2.x += background_rect2.width
     window.blit(background, background_rect2)
 
-    # Desenha a rua
-    window.blit(rua_img, (0, 200))
-    # Desenha a rua
-    window.blit(placas_img, (0, 130))
+    # Desenha as placas se movendo
+    window.blit(placas_img, placas_rect)
+    placas_rect2 = placas_rect.copy()
+    placas_rect2.x += placas_rect2.width
+    window.blit(placas_img, placas_rect2)
 
-    # Desenha sprites
-    todos_sprites.draw(window)
+    # 4. Plataformas 
+    plataformas.draw(window)
+
+    # 5. Jogador 
+    window.blit(player.image, player.rect)
+
+    # 5. Jogador 
+    window.blit(player.image, player.rect)
 
     # Desenha a mão da quantidade de zombies
     window.blit(mao_img, (10,10))
@@ -194,5 +297,5 @@ while game:
     window.blit(qnt_moedas, (170,200))
 
     pygame.display.update()
-
+   
 pygame.quit()
