@@ -4,6 +4,10 @@ import random
 
 # INICIALIZAÇÃO
 pygame.init()
+pygame.mixer.init()                                    # ← ADICIONA
+pygame.mixer.music.load("assets/img/musica_fundo.mp3")           # ← ADICIONA
+pygame.mixer.music.play(-1)                            # ← ADICIONA (loop infinito)
+clock = pygame.time.Clock()
 clock = pygame.time.Clock() #relógio para controlar a velocidade do jogo
 
 # Dados gerais do jogo
@@ -322,6 +326,7 @@ while game:
     # Atualiza jogador e plataformas
     game_over = player.update(plataformas)
     if game_over:
+        pygame.mixer.music.load("assets/img/musica_fundo.mp3")
         game = False
     plataformas.update()
 
