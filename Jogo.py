@@ -134,9 +134,9 @@ PESSOAS_FRAMES = []
 for i in range(1, 5):
     try:
         f1 = pygame.image.load(f"assets/img/pessoa{i}.1.png").convert_alpha()
-        f1 = pygame.transform.scale(f1, (80, 130))
+        f1 = pygame.transform.scale(f1, (110, 160))
         f2 = pygame.image.load(f"assets/img/pessoa{i}.2.png").convert_alpha()
-        f2 = pygame.transform.scale(f2, (80, 130))
+        f2 = pygame.transform.scale(f2, (110, 160))
         PESSOAS_FRAMES.append([f1, f2])
     except:
         print(f"Aviso: pessoa{i}.1.png ou pessoa{i}.2.png não encontrado")
@@ -401,6 +401,10 @@ class Pessoa(pygame.sprite.Sprite):
             self.rect.height
         )
 
+        # margem para não sobrepor
+        self.rect.width  = 110
+        self.rect.height = 160
+
     def update(self):
         # Animação: alterna entre os 2 frames
         self.timer_anim += 1
@@ -428,29 +432,34 @@ class Pessoa(pygame.sprite.Sprite):
 
 
 def gerar_pessoa(plat):
-    """Gera uma pessoa aleatória numa plataforma sólida, com 40% de chance."""
     if not PESSOAS_FRAMES:
         return
     if id(plat.image) not in PLATS_VEICULO:
         return
-    if random.random() > 0.4:
-        return
 
-    frames = random.choice(PESSOAS_FRAMES)
-    nova   = Pessoa(plat, frames)
+    # Sorteia quantas pessoas vão aparecer (0, 1, 2 ou 3)
+    quantidade = random.choices([0, 1, 2, 3], weights=[20, 35, 30, 15])[0]
 
-    # Não sobrepõe moedas nem veículos nem outras pessoas
-    for m in moedas:
-        if nova.rect.colliderect(m.rect):
-            return
-    for v in veiculos:
-        if nova.rect.colliderect(v.rect):
-            return
-    for p in pessoas:
-        if nova.rect.colliderect(p.rect):
-            return
+    x_ocupados = []  # controla posições já usadas para não sobrepor
 
-    pessoas.add(nova)
+    for _ in range(quantidade):
+        frames = random.choice(PESSOAS_FRAMES)
+        nova   = Pessoa(plat, frames)
+
+        # Verifica sobreposição com moedas
+        colidiu = any(nova.rect.colliderect(m.rect) for m in moedas)
+        # Verifica sobreposição com veículos
+        colidiu = colidiu or any(nova.rect.colliderect(v.rect) for v in veiculos)
+        # Verifica sobreposição com outras pessoas
+        colidiu = colidiu or any(nova.rect.colliderect(p.rect) for p in pessoas)
+        # Verifica sobreposição com pessoas já geradas nesta rodada
+        colidiu = colidiu or any(
+            abs(nova.rect.centerx - x) < 90 for x in x_ocupados
+        )
+
+        if not colidiu:
+            pessoas.add(nova)
+            x_ocupados.append(nova.rect.centerx)
 
 #  CLASSE VEÍCULO
 class Veiculo(pygame.sprite.Sprite):
@@ -662,14 +671,12 @@ while x_final < WIDTH + 200:
             todos_sprites.add(plat)
             plataformas.add(plat)
             gerar_moedas(plat)
-            gerar_bomba(plat)
             gerar_pessoa(plat)
         ultima_plat = resultado[-1]
     else:
         todos_sprites.add(resultado)
         plataformas.add(resultado)
         gerar_moedas(resultado)
-        gerar_bomba(resultado)
         gerar_pessoa(resultado)
         ultima_plat = resultado
     x_final = ultima_plat.hitbox.right
@@ -777,6 +784,7 @@ while game:
             todos_sprites.add(nova_plat)
             plataformas.add(nova_plat)
             gerar_bomba(nova_plat)
+            gerar_pessoa(nova_plat)
         plats_visiveis = [p for p in plataformas if p.rect.right > 0]
 
     # Desenha as placas se movendo
