@@ -4,9 +4,17 @@ import random
 
 # Inicialização e música de fundo
 pygame.init()
+<<<<<<< HEAD
 pygame.mixer.init()                                    
 pygame.mixer.music.load("assets/snd/musica_fundo.mp3") 
 pygame.mixer.music.play(-1) #gerar looping da música
+=======
+pygame.mixer.init()                                    # ADICIONA
+pygame.mixer.music.load("assets/snd/musica_fundo.mp3")
+pygame.mixer.music.load("assets/snd/audiodegrito.mp3")             # ADICIONA
+pygame.mixer.music.play(-1)                            # ADICIONA (loop infinito)
+clock = pygame.time.Clock()
+>>>>>>> 65c0b6277b89377442b8089f3d67fa9fb9190a82
 clock = pygame.time.Clock() #relógio para controlar a velocidade do jogo
 
 # Dados gerais do jogo 
