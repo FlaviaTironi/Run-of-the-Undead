@@ -7,6 +7,7 @@ pygame.init()
 pygame.mixer.init()                                    
 pygame.mixer.music.load("assets/snd/musica_fundo.mp3") 
 pygame.mixer.music.play(-1)
+som_explosao = pygame.mixer.Sound("assets/snd/Somexplosão.mp3")
 # pygame.mixer.init()                                    # ADICIONA
 # pygame.mixer.music.load("assets/snd/musica_fundo.mp3")
 # pygame.mixer.music.load("assets/snd/audiodegrito.mp3")             # ADICIONA
