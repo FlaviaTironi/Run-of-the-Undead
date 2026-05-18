@@ -7,6 +7,7 @@ pygame.init()
 pygame.mixer.init()                                    
 pygame.mixer.music.load("assets/snd/musica_fundo.mp3") 
 pygame.mixer.music.play(-1) #gerar looping da música
+som_explosao = pygame.mixer.Sound("assets/snd/Somexplosão.mp3") 
 #=======
 # pygame.mixer.init()                                    # ADICIONA
 # pygame.mixer.music.load("assets/snd/musica_fundo.mp3")
@@ -495,6 +496,7 @@ while game:
     # Colisão com bombas
     bombas_atingidas = pygame.sprite.spritecollide(player, bombas, True)
     for bomba in bombas_atingidas:
+        som_explosao.play()
         zombie_count -= bomba.dano
         if zombie_count <= 0:
             zombie_count = 0
