@@ -4,17 +4,15 @@ import random
 
 # Inicialização e música de fundo
 pygame.init()
-<<<<<<< HEAD
 pygame.mixer.init()                                    
 pygame.mixer.music.load("assets/snd/musica_fundo.mp3") 
 pygame.mixer.music.play(-1) #gerar looping da música
-=======
-pygame.mixer.init()                                    # ADICIONA
-pygame.mixer.music.load("assets/snd/musica_fundo.mp3")
-pygame.mixer.music.load("assets/snd/audiodegrito.mp3")             # ADICIONA
-pygame.mixer.music.play(-1)                            # ADICIONA (loop infinito)
+#=======
+# pygame.mixer.init()                                    # ADICIONA
+# pygame.mixer.music.load("assets/snd/musica_fundo.mp3")
+# pygame.mixer.music.load("assets/snd/audiodegrito.mp3")             # ADICIONA
+# pygame.mixer.music.play(-1)                            # ADICIONA (loop infinito)
 clock = pygame.time.Clock()
->>>>>>> 65c0b6277b89377442b8089f3d67fa9fb9190a82
 clock = pygame.time.Clock() #relógio para controlar a velocidade do jogo
 
 # Dados gerais do jogo 
@@ -99,15 +97,15 @@ plat3_img = pygame.transform.scale(plat3_img, (largura, altura))
 
 # Imagens das bombas
 bomba_imgs = {
-    "atomica":    (pygame.transform.scale(pygame.image.load("assets/img/atomica.png").convert_alpha(),    (120, 120)), 10),
-    "barril":     (pygame.transform.scale(pygame.image.load("assets/img/barril.png").convert_alpha(),     (120, 120)), 10),
-    "bomba":      (pygame.transform.scale(pygame.image.load("assets/img/bomba.png").convert_alpha(),      (120, 120)), 4),
-    "explosivo2": (pygame.transform.scale(pygame.image.load("assets/img/explosivo2.png").convert_alpha(), (120, 120)), 1),
-    "explosivos": (pygame.transform.scale(pygame.image.load("assets/img/explosivos.png").convert_alpha(), (120, 120)), 2),
-    "foguete":    (pygame.transform.scale(pygame.image.load("assets/img/foguete.png").convert_alpha(),    (120, 120)), 12),
-    "fronte":     (pygame.transform.scale(pygame.image.load("assets/img/fronte.png").convert_alpha(),     (120, 120)), 2),
-    "granada":    (pygame.transform.scale(pygame.image.load("assets/img/granada.png").convert_alpha(),    (120, 120)), 3),
-    "toxico":     (pygame.transform.scale(pygame.image.load("assets/img/toxico.png").convert_alpha(),     (120, 120)), 16),
+    "atomica":    (pygame.transform.scale(pygame.image.load("assets/img/atomica.png").convert_alpha(),    (100, 100)), 10),
+    "barril":     (pygame.transform.scale(pygame.image.load("assets/img/barril.png").convert_alpha(),     (100, 100)), 10),
+    "bomba":      (pygame.transform.scale(pygame.image.load("assets/img/bomba.png").convert_alpha(),      (100, 100)), 4),
+    "explosivo2": (pygame.transform.scale(pygame.image.load("assets/img/explosivo2.png").convert_alpha(), (100, 100)), 1),
+    "explosivos": (pygame.transform.scale(pygame.image.load("assets/img/explosivos.png").convert_alpha(), (100, 100)), 2),
+    "foguete":    (pygame.transform.scale(pygame.image.load("assets/img/foguete.png").convert_alpha(),    (100, 100)), 12),
+    "fronte":     (pygame.transform.scale(pygame.image.load("assets/img/fronte.png").convert_alpha(),     (100, 100)), 2),
+    "granada":    (pygame.transform.scale(pygame.image.load("assets/img/granada.png").convert_alpha(),    (100, 100)), 3),
+    "toxico":     (pygame.transform.scale(pygame.image.load("assets/img/toxico.png").convert_alpha(),     (100, 100)), 16),
 }
 # Definir hitbox  para cada imagem
 HITBOX_OFFSETS = {id(rua_esq_img): (5, 220, 20),id(rua_meio_img): (5, 220, 20),id(rua_dir_img): (5, 220, 20),id(rua_img): (5, 220, 20),id(plat1_img): (5 , 220, 580),id(plat2_img): (270, 220, 540),id(plat3_img): (580, 220, 585),}
@@ -150,11 +148,11 @@ def calcular_gap_seguro(plat_anterior):
     velocidade = abs(velocidade_mundo)
 
     if plat_anterior.image is plat3_img:
-        base_min, base_max = 160, 200
+        base_min, base_max = 180, 210
     elif plat_anterior.image is plat2_img:
-        base_min, base_max = 130, 170
+        base_min, base_max = 150, 180
     elif plat_anterior.image is plat1_img:
-        base_min, base_max = 140, 170
+        base_min, base_max = 160, 180
     else:  # rua_img
             base_min, base_max = 160, 190
         
