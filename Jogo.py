@@ -743,6 +743,7 @@ while game:
     # Colisão com bombas
     bombas_atingidas = pygame.sprite.spritecollide(player, bombas, True)
     for bomba in bombas_atingidas:
+        som_explosao.play()
         zombie_count -= bomba.dano
         if zombie_count <= 0:
             zombie_count = 0
