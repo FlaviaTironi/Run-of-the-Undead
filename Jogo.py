@@ -2,15 +2,14 @@
 import pygame
 import random
 
-# INICIALIZAÇÃO
+# Inicialização e música de fundo
 pygame.init()
-pygame.mixer.init()                                    # ADICIONA
-pygame.mixer.music.load("assets/snd/musica_fundo.mp3")           # ADICIONA
-pygame.mixer.music.play(-1)                            # ADICIONA (loop infinito)
-clock = pygame.time.Clock()
+pygame.mixer.init()                                    
+pygame.mixer.music.load("assets/snd/musica_fundo.mp3") 
+pygame.mixer.music.play(-1) #gerar looping da música
 clock = pygame.time.Clock() #relógio para controlar a velocidade do jogo
 
-# Dados gerais do jogo
+# Dados gerais do jogo 
 WIDTH = 1710
 HEIGHT = 900
 FPS = 60
@@ -46,8 +45,20 @@ background = pygame.image.load("assets/img/prediosfogo.png").convert()
 background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 background_rect = background.get_rect()
 
+gameover_img = pygame.image.load("assets/img/game_over.png").convert_alpha()
+gameover_img = pygame.transform.scale(gameover_img, (WIDTH, HEIGHT))
+
 rua_img = pygame.image.load("assets/img/estrada.png").convert_alpha()
 rua_img = pygame.transform.scale(rua_img, (largura, altura))
+
+rua_esq_img = pygame.image.load("assets/img/estrada3.png").convert_alpha()
+rua_esq_img = pygame.transform.scale(rua_esq_img, (largura, altura))
+
+rua_meio_img = pygame.image.load("assets/img/estrada2.png").convert_alpha()
+rua_meio_img = pygame.transform.scale(rua_meio_img, (largura, altura))
+
+rua_dir_img = pygame.image.load("assets/img/estrada4.png").convert_alpha()
+rua_dir_img = pygame.transform.scale(rua_dir_img, (largura, altura))
 
 plat1_img = pygame.image.load("assets/img/plat5.png").convert_alpha()
 plat1_img = pygame.transform.scale(plat1_img, (largura, altura))
@@ -67,24 +78,39 @@ placas_rect.y = 130
 zombie_img = pygame.image.load("assets/img/zombie.png").convert_alpha()
 zombie_img = pygame.transform.scale(zombie_img, (80, 100))
 
-mao_img = pygame.image.load("assets/img/mao.png").convert_alpha()
-mao_img = pygame.transform.scale(mao_img, (200,200))
+mao_img = pygame.image.load("assets/img/cerebro.png").convert_alpha()
+mao_img = pygame.transform.scale(mao_img, (90,90))
 
 moeda_img = pygame.image.load("assets/img/moeda.png").convert_alpha()
 moeda_img = pygame.transform.scale(moeda_img, (70,70))
 
+moeda_coletada = pygame.image.load("assets/img/moeda.png").convert_alpha()
+moeda_coletada = pygame.transform.scale(moeda_coletada,(40,40))
+
 plat3_img = pygame.transform.scale(plat3_img, (largura, altura))
 
-# Define hitbox específico para cada imagem
-HITBOX_OFFSETS = {id(rua_img): (5, 220, 20),id(plat1_img): (5 , 220, 580),id(plat2_img): (270, 220, 540),id(plat3_img): (580, 220, 585),}
+# Imagens das bombas
+bomba_imgs = {
+    "atomica":    (pygame.transform.scale(pygame.image.load("assets/img/atomica.png").convert_alpha(),    (120, 120)), 10),
+    "barril":     (pygame.transform.scale(pygame.image.load("assets/img/barril.png").convert_alpha(),     (120, 120)), 10),
+    "bomba":      (pygame.transform.scale(pygame.image.load("assets/img/bomba.png").convert_alpha(),      (120, 120)), 4),
+    "explosivo2": (pygame.transform.scale(pygame.image.load("assets/img/explosivo2.png").convert_alpha(), (120, 120)), 1),
+    "explosivos": (pygame.transform.scale(pygame.image.load("assets/img/explosivos.png").convert_alpha(), (120, 120)), 2),
+    "foguete":    (pygame.transform.scale(pygame.image.load("assets/img/foguete.png").convert_alpha(),    (120, 120)), 12),
+    "fronte":     (pygame.transform.scale(pygame.image.load("assets/img/fronte.png").convert_alpha(),     (120, 120)), 2),
+    "granada":    (pygame.transform.scale(pygame.image.load("assets/img/granada.png").convert_alpha(),    (120, 120)), 3),
+    "toxico":     (pygame.transform.scale(pygame.image.load("assets/img/toxico.png").convert_alpha(),     (120, 120)), 16),
+}
+# Definir hitbox  para cada imagem
+HITBOX_OFFSETS = {id(rua_esq_img): (5, 220, 20),id(rua_meio_img): (5, 220, 20),id(rua_dir_img): (5, 220, 20),id(rua_img): (5, 220, 20),id(plat1_img): (5 , 220, 580),id(plat2_img): (270, 220, 540),id(plat3_img): (580, 220, 585),}
 
 #Criando conjuntos de possíveis plataformas + posição plataforma (500)
-PLAT = [rua_img,plat1_img,plat2_img,plat3_img]
+PLAT = [rua_img, plat1_img, plat2_img, plat3_img]
 chao = HEIGHT -400
 
 tempo_pulo_max = 15
-VEL_PULO = -20
-GRAVIDADE = 1
+Velocidade_pulo = -20
+gravidade = 1
 
 def calcular_tempo_no_ar():
     y = 0
@@ -93,23 +119,23 @@ def calcular_tempo_no_ar():
     pulando = True
     frames = 0
 
-    while True:
+    while True: #contar quantidade de frames
         frames += 1
 
-        if pulando and tempo_pulo > 0:
-            vy = VEL_PULO
+        if pulando and tempo_pulo > 0: # verificar se o personagem está no impulso do pulo (e ainda se stá disponível)
+            vy = Velocidade_pulo
             tempo_pulo -= 1
 
-        vy += GRAVIDADE
+        vy += gravidade
         y += vy
 
-        if tempo_pulo == 0:
+        if tempo_pulo == 0: #impulso pulo acabou
             pulando = False
 
-        if y >= 0 and frames > 1:
+        if y >= 0 and frames > 1: # player voltou ou passou do chao - deolve n° total de frames no ar
             return frames
 
-TEMPO_NO_AR_MAX = calcular_tempo_no_ar()
+tempo_no_ar_max = calcular_tempo_no_ar()
 
 
 def calcular_gap_seguro(plat_anterior):
@@ -126,7 +152,7 @@ def calcular_gap_seguro(plat_anterior):
         
 
     # aumenta o gap conforme a velocidade do jogo aumenta
-    bonus = max(0, (velocidade - 4) * 12)
+    bonus = max(0, (velocidade - 4) * 15)
 
     gap_min = base_min + bonus
     gap_max = base_max + bonus
@@ -197,27 +223,122 @@ class Plataforma (pygame.sprite.Sprite):
             self.kill()
 
 def criar_proxima_plataforma(plat_anterior):
+    chance_trio = 0.2
+    if random.random() < chance_trio:
+        return criar_trio(plat_anterior)
+
     imagem = random.choices(PLAT, weights=[5, 1, 1, 1], k=1)[0]
     margem_esq, offset_y, corte = HITBOX_OFFSETS[id(imagem)]
-
-
-    # Rua juntas
-    if plat_anterior.image is rua_img and imagem is rua_img:
-        # juntar ruas grandes
-        if random.random() < 0.80:
-            x = plat_anterior.rect.right
-        else:
-            # deixar buracos ruas grandes 
-            gap = random.randint(20, 80)
-            x = plat_anterior.rect.right + gap
-
-    else:
-        # demais casos continuam com gap controlado
-        gap = calcular_gap_seguro(plat_anterior)
-        x = plat_anterior.hitbox.right + gap - margem_esq
-
+    gap = calcular_gap_seguro(plat_anterior)
+    x = plat_anterior.hitbox.right + gap - margem_esq
     return Plataforma(x, chao, imagem)
 
+def criar_trio(plat_anterior):
+
+    gap = calcular_gap_seguro(plat_anterior)
+
+    # posição inicial do trio
+    margem_esq, _, _ = HITBOX_OFFSETS[id(rua_esq_img)]
+
+    x_inicio = plat_anterior.hitbox.right + gap - margem_esq
+
+    # esquerda
+    plat_esq = Plataforma(x_inicio, chao, rua_esq_img)
+
+    # meio colado
+    plat_meio = Plataforma(plat_esq.rect.right,chao,rua_meio_img)
+    # direita colada
+    plat_dir = Plataforma(plat_meio.rect.right,chao,rua_dir_img)
+
+    return (plat_esq, plat_meio, plat_dir)
+
+
+# ====== Classe moeda ======
+class Moeda(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = moeda_coletada
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+    def update(self):
+        self.rect.x += velocidade_mundo
+        if self.rect.right < 0:
+            self.kill()
+
+def gerar_moedas(plat):
+    if random.random() < 0.5:
+        padrao = random.choice(['linha', 'arco', 'escada'])
+        
+        x_base = random.randint(plat.hitbox.left, plat.hitbox.right - 200)
+        y_base = plat.hitbox.top - 160
+
+        if padrao == 'linha':
+            # 5 moedas em linha horizontal
+            for i in range(5):
+                moeda = Moeda(x_base + i * 50, y_base)
+                moedas.add(moeda)
+                todos_sprites.add(moeda)
+
+        elif padrao == 'arco':
+            # 5 moedas em arco
+            alturas = [0, -60, -100, -60, 0]
+            for i in range(5):
+                moeda = Moeda(x_base + i * 50, y_base + alturas[i])
+                moedas.add(moeda)
+                todos_sprites.add(moeda)
+
+        elif padrao == 'escada':
+            # 5 moedas em escada subindo
+            for i in range(5):
+                moeda = Moeda(x_base + i * 50, y_base - i * 30)
+                moedas.add(moeda)
+                todos_sprites.add(moeda)
+
+
+#===== Classe bombas =====
+class Bomba(pygame.sprite.Sprite):
+    def __init__(self, x, y, imagem, dano):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = imagem
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.bottom = y  # fica no chão da plataforma
+        self.dano = dano      # quantidade de zombies que mata
+
+    def update(self):
+        self.rect.x += velocidade_mundo
+        if self.rect.right < 0:
+            self.kill()
+
+def gerar_bomba(plat):
+    # não gera bomba nas plataformas pequenas
+    if plat.image in [plat1_img, plat2_img, plat3_img]:
+        return
+
+    # Escolhe bombas baseado no tamanho da horda
+    if zombie_count < 5:
+        opcoes = ["explosivo2", "explosivos", "fronte", "granada", "bomba"]
+    elif zombie_count < 10:
+        opcoes = ["bomba", "granada", "fronte", "explosivos", "barril", "atomica"]
+    else:
+        opcoes = ["barril", "atomica", "foguete", "toxico"]
+
+    if random.random() < 0.4:
+        nome = random.choice(opcoes)
+        imagem, dano = bomba_imgs[nome]
+
+        min_x = plat.hitbox.left + 20
+        max_x = plat.hitbox.right - imagem.get_width() - 20
+
+        if max_x <= min_x:
+            return
+
+        x = random.randint(min_x, max_x)
+        y = plat.hitbox.top
+        bomba = Bomba(x, y, imagem, dano)
+        bombas.add(bomba)
 #===== Classe jogador =====
 class Jogador (pygame.sprite.Sprite):
     def __init__(self):
@@ -239,6 +360,7 @@ class Jogador (pygame.sprite.Sprite):
         # Pulo
         self.velocidade_y = 0 
         self.chao = True #permitir pular
+
 
     def update(self,plataformas):
         # Pulo longo baseado no tempo segurando
@@ -278,8 +400,11 @@ class Jogador (pygame.sprite.Sprite):
 # Criar jogador + grupo sprites
 player = Jogador()
 todos_sprites = pygame.sprite.Group()
+moedas = pygame.sprite.Group()
+bombas = pygame.sprite.Group()
 plataformas = pygame.sprite.Group()
 todos_sprites.add(player)
+
 
 # Criação plataformas iniciais
 
@@ -297,11 +422,21 @@ ultima_plat = plat_inicial
 x_final = plat_inicial.hitbox.right
 
 while x_final < WIDTH + 200:
-    plat = criar_proxima_plataforma(ultima_plat)
-    todos_sprites.add(plat)
-    plataformas.add(plat)
-    ultima_plat = plat
-    x_final = plat.hitbox.right
+    resultado = criar_proxima_plataforma(ultima_plat)
+    if isinstance(resultado, tuple):
+        for plat in resultado:
+            todos_sprites.add(plat)
+            plataformas.add(plat)
+            gerar_moedas(plat)
+            gerar_bomba(plat) 
+        ultima_plat = resultado[-1]
+    else:
+        todos_sprites.add(resultado)
+        plataformas.add(resultado)
+        gerar_moedas(resultado)
+        gerar_bomba(resultado) 
+        ultima_plat = resultado
+    x_final = ultima_plat.hitbox.right
 
 # ===== Loop principal =====
 while game:
@@ -339,9 +474,29 @@ while game:
     # Atualiza jogador e plataformas
     game_over = player.update(plataformas)
     if game_over:
-        pygame.mixer.music.load("assets/snd/musica_fundo.mp3")
+        # Mostra tela de game over
+        window.blit(gameover_img, (0, 0))
+        pygame.display.update()
+        pygame.time.wait(3000)  # espera 3 segundos
         game = False
     plataformas.update()
+
+    # Coleta de moedas
+    moedas_coletadas = pygame.sprite.spritecollide(player, moedas, True)
+    for _ in moedas_coletadas:
+        coins += 1
+
+    # Colisão com bombas
+    bombas_atingidas = pygame.sprite.spritecollide(player, bombas, True)
+    for bomba in bombas_atingidas:
+        zombie_count -= bomba.dano
+        if zombie_count <= 0:
+            zombie_count = 0
+            game_over = True
+
+    # Atualiza moedas e bomba
+    moedas.update()
+    bombas.update()
 
     # Desenha o fundo duas vezes
     window.fill(preto)
@@ -355,11 +510,23 @@ while game:
     while not plats_visiveis or max(p.rect.right for p in plats_visiveis) < WIDTH:
         ultima_plat = max(plats_visiveis, key=lambda p: p.hitbox.right) if plats_visiveis else None
         if ultima_plat:
-            nova_plat = criar_proxima_plataforma(ultima_plat)
+            resultado = criar_proxima_plataforma(ultima_plat)
+            if isinstance(resultado, tuple):
+                for plat in resultado:
+                    todos_sprites.add(plat)
+                    plataformas.add(plat)
+                    gerar_moedas(plat)
+                ultima_plat = resultado[-1]
+            else:
+                todos_sprites.add(resultado)
+                plataformas.add(resultado)
+                gerar_moedas(resultado)
+                ultima_plat = resultado
         else:
             nova_plat = Plataforma(WIDTH, chao, random.choice(PLAT))
-        todos_sprites.add(nova_plat)
-        plataformas.add(nova_plat)
+            todos_sprites.add(nova_plat)
+            plataformas.add(nova_plat)
+            gerar_bomba(nova_plat)
         plats_visiveis = [p for p in plataformas if p.rect.right > 0]
 
 # Desenha as placas se movendo
@@ -371,14 +538,23 @@ while game:
     # 4. Plataformas 
     plataformas.draw(window)
 
-    # 5. Jogador 
+    # 5. Moedas
+    moedas.draw(window)
+
+    #6. Bombas
+    bombas.draw(window)
+
+
+    # MOSTRAR HITBOX DAS BOMBAS
+    for bomba in bombas:
+        pygame.draw.rect(window, vermelho, bomba.rect, 2)
+
+    # 7. Jogador 
     window.blit(player.image, player.rect)
 
-    # 5. Jogador 
-    window.blit(player.image, player.rect)
 
     # Desenha a mão da quantidade de zombies
-    window.blit(mao_img, (10,10))
+    window.blit(mao_img, (70,70))
     # Texto quantidade moedas
     qnt_zombie = font.render(str(zombie_count), True, branco)
     window.blit(qnt_zombie, (170,100))
