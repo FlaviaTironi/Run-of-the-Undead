@@ -98,7 +98,7 @@ plat3_img = pygame.transform.scale(plat3_img, (largura, altura))
 # Imagens das bombas
 bomba_imgs = {
     "atomica":    (pygame.transform.scale(pygame.image.load("assets/img/atomica.png").convert_alpha(),    (100, 100)), 10),
-    "barril":     (pygame.transform.scale(pygame.image.load("assets/img/barril.png").convert_alpha(),     (100, 100)), 10),
+    "barril":     (pygame.transform.scale(pygame.image.load("assets/img/barril.png").convert_alpha(),     (10, 100)), 10),
     "bomba":      (pygame.transform.scale(pygame.image.load("assets/img/bomba.png").convert_alpha(),      (100, 100)), 4),
     "explosivo2": (pygame.transform.scale(pygame.image.load("assets/img/explosivo2.png").convert_alpha(), (100, 100)), 1),
     "explosivos": (pygame.transform.scale(pygame.image.load("assets/img/explosivos.png").convert_alpha(), (100, 100)), 2),
@@ -456,7 +456,7 @@ while game:
             if event.key == pygame.K_SPACE:
                 player.pular()
 
-        if event.type == pygame.KEYUP:  # quando SOLTA a tecla
+        if event.type == pygame.KEYUP:  # quando solta a tecla
             if event.key == pygame.K_SPACE:
                 player.soltar_pulo()
 
