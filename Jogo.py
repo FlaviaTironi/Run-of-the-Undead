@@ -186,6 +186,7 @@ def calcular_tempo_no_ar():
             return frames
 
 tempo_no_ar_max = calcular_tempo_no_ar()
+
 def calcular_gap_seguro(plat_anterior):
     velocidade = abs(velocidade_mundo)
     if plat_anterior.image is plat3_img:
@@ -244,7 +245,6 @@ while inicio_jogo:
     pygame.display.update()
 
 
-
 #  CLASSE PLATAFORMA
 class Plataforma(pygame.sprite.Sprite):
     def __init__(self, x, y, imagem=None):
@@ -293,7 +293,6 @@ def criar_trio(plat_anterior):
     return (plat_esq, plat_meio, plat_dir)
 
 
-
 #  CLASSE MOEDA
 class Moeda(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -326,7 +325,6 @@ def gerar_moedas(plat):
             for i in range(5):
                 m = Moeda(x_base + i * 50, y_base - i * 30)
                 moedas.add(m); todos_sprites.add(m)
-
 
 
 #  CLASSE BOMBA
@@ -461,6 +459,7 @@ def gerar_pessoa(plat):
             pessoas.add(nova)
             x_ocupados.append(nova.rect.centerx)
 
+
 #  CLASSE VEÍCULO
 class Veiculo(pygame.sprite.Sprite):
     def __init__(self, plataforma, img, numero):
@@ -572,6 +571,91 @@ def spawnar_veiculo(plataformas):
 
 
 
+#  CLASSE ZUMBI EXTRA (segue o líder com delay)
+
+DELAY_PULO    = 8    # frames de delay entre cada zumbi na fila
+ESPACO_FILA   = 70  # pixels de espaço entre cada zumbi
+
+class ZumbiExtra(pygame.sprite.Sprite):
+    def __init__(self, posicao_na_fila):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = zombie_img
+        self.rect  = self.image.get_rect()
+
+        self.posicao_na_fila = posicao_na_fila  # 1, 2, 3...
+        self.velocidade_y    = 0
+        self.chao            = True
+
+        # Timer de delay do pulo — cada zumbi espera mais
+        self.timer_pulo_delay = 0
+        self.delay_total      = posicao_na_fila * DELAY_PULO
+        self.aguardando_pulo  = False
+        self.pulando          = False
+        self.tempo_pulo       = 0
+        self.tempo_pulo_max   = 15
+
+        # Posição inicial: atrás do player
+        self.rect.x      = 150 - posicao_na_fila * ESPACO_FILA
+        self.rect.bottom = 720
+
+    def iniciar_pulo_delay(self):
+        # Chamado quando o líder pula — começa a contar o delay.
+        if self.chao and not self.aguardando_pulo and not self.pulando:
+            self.aguardando_pulo  = True
+            self.timer_pulo_delay = 0
+
+    def soltar_pulo(self):
+        self.pulando    = False
+        self.tempo_pulo = 0
+
+    def update(self, plataformas, veiculos):
+        # Delay do pulo
+        if self.aguardando_pulo:
+            self.timer_pulo_delay += 1
+            if self.timer_pulo_delay >= self.delay_total:
+                self.aguardando_pulo = False
+                if self.chao:
+                    self.pulando    = True
+                    self.tempo_pulo = self.tempo_pulo_max
+                    self.chao       = False
+
+        # Pulo
+        if self.pulando and self.tempo_pulo > 0:
+            self.velocidade_y = -20
+            self.tempo_pulo  -= 1
+
+        # Gravidade
+        self.velocidade_y += 1
+        self.rect.y       += self.velocidade_y
+
+        # Posição X: segue atrás do player com espaço fixo
+        x_alvo = 150 - self.posicao_na_fila * ESPACO_FILA
+        self.rect.x = x_alvo
+
+        self.chao = False
+
+        # Colisão com plataformas
+        for plat in plataformas:
+            if self.rect.colliderect(plat.hitbox):
+                if self.velocidade_y > 0:
+                    self.rect.bottom = plat.hitbox.top
+                    self.velocidade_y = 0
+                    self.chao = True
+
+        # Colisão com veículos (pousa em cima)
+        for v in veiculos:
+            if self.rect.colliderect(v.hitbox_topo):
+                if self.velocidade_y > 0:
+                    self.rect.bottom = v.hitbox_topo.top
+                    self.velocidade_y = 0
+                    self.chao = True
+
+        # Cai no buraco → game over (tratado no loop principal)
+        if self.rect.top > HEIGHT:
+            return True
+        return False
+
+
 #  CLASSE JOGADOR
 class Jogador(pygame.sprite.Sprite):
     def __init__(self):
@@ -594,22 +678,19 @@ class Jogador(pygame.sprite.Sprite):
         self.velocidade_x = 0
         self.chao = True #permitir pular
 
-
-    def update(self, plataformas, veiculos,pessoas):
+    def update(self, plataformas, veiculos, pessoas):
         if self.pulando and self.tempo_pulo > 0:
             self.velocidade_y = -20
             self.tempo_pulo  -= 1
 
-            if self.rect.x <150 and self.velocidade_x ==0:
+            if self.rect.x < 150 and self.velocidade_x == 0:
                 self.velocidade_x += 5
-                
 
         self.velocidade_y += 1
         self.rect.y += self.velocidade_y
 
-
         self.rect.x += self.velocidade_x 
-        if self.rect.x >=  150:
+        if self.rect.x >= 150:
             self.velocidade_x = 0
             self.rect.x = 150
 
@@ -652,10 +733,15 @@ class Jogador(pygame.sprite.Sprite):
             self.pulando = True
             self.tempo_pulo = self.tempo_pulo_max
             self.chao = False
+            # Avisa todos os zumbis extras para preparar o pulo com delay
+            for z in zumbis_extras:
+                z.iniciar_pulo_delay()
 
     def soltar_pulo(self): # chamado quando SOLTA o espaço
         self.pulando = False # desativar o pulo
         self.tempo_pulo = 0
+        for z in zumbis_extras:
+            z.soltar_pulo()
 
 
 # Criar jogador + grupo sprites
@@ -666,6 +752,7 @@ bombas = pygame.sprite.Group()
 plataformas = pygame.sprite.Group()
 veiculos = pygame.sprite.Group()
 pessoas = pygame.sprite.Group()
+zumbis_extras = pygame.sprite.Group()  # grupo da horda
 todos_sprites.add(player)
 
 
@@ -745,7 +832,7 @@ while game:
             velocidade_mundo -= 1
 
     # Atualiza jogador passando veículos também
-    game_over = player.update(plataformas, veiculos,pessoas)
+    game_over = player.update(plataformas, veiculos, pessoas)
     if game_over:
         window.blit(gameover_img, (0, 0))
         pygame.display.update()
@@ -757,6 +844,20 @@ while game:
     veiculos.update()
     pessoas.update()
 
+    # Atualiza zumbis extras
+    for z in list(zumbis_extras):
+        caiu = z.update(plataformas, veiculos)
+        if caiu:
+            z.kill()
+
+    # Colisão do player com pessoas → some a pessoa, adiciona zumbi extra
+    pessoas_atingidas = pygame.sprite.spritecollide(player, pessoas, True)
+    for _ in pessoas_atingidas:
+        zombie_count += 1
+        nova_posicao = len(zumbis_extras) + 1
+        novo_z = ZumbiExtra(nova_posicao)
+        zumbis_extras.add(novo_z)
+
     # Coleta de moedas
     moedas_coletadas = pygame.sprite.spritecollide(player, moedas, True)
     for _ in moedas_coletadas:
@@ -767,6 +868,10 @@ while game:
     for bomba in bombas_atingidas:
         som_explosao.play()
         zombie_count -= bomba.dano
+        # Remove zumbis extras se zombie_count diminuiu
+        while len(zumbis_extras) >= zombie_count and len(zumbis_extras) > 0:
+            ultimo = list(zumbis_extras)[-1]
+            ultimo.kill()
         if zombie_count <= 0:
             zombie_count = 0
             game_over = True
@@ -835,7 +940,11 @@ while game:
     for v in veiculos:
         window.blit(v.image, v.rect)
 
-    # 8. Jogador 
+    # 8. Zumbis extras (desenhados antes do líder para ficar atrás)
+    for z in zumbis_extras:
+        window.blit(z.image, z.rect)
+
+    # 9. Jogador (líder — desenhado por cima)
     window.blit(player.image, player.rect)
 
     # Desenha a mão da quantidade de zombies
