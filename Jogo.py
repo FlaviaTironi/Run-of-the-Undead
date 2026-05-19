@@ -591,17 +591,27 @@ class Jogador(pygame.sprite.Sprite):
 
         # Pulo
         self.velocidade_y = 0
+        self.velocidade_x = 0
         self.chao = True #permitir pular
 
-    def update(self, plataformas, veiculos,pessoas):
-        # Pulo longo baseado no tempo segurando
-        if self.pulando and self.tempo_pulo > 0:  # enquanto o espaço está sendo segurado e ainda tem tempo de pulo, manter a velicodade subindo
-            self.velocidade_y = -20
-            self.tempo_pulo -= 1
 
-        # Gravidade
+    def update(self, plataformas, veiculos,pessoas):
+        if self.pulando and self.tempo_pulo > 0:
+            self.velocidade_y = -20
+            self.tempo_pulo  -= 1
+
+            if self.rect.x <150 and self.velocidade_x ==0:
+                self.velocidade_x += 5
+                
+
         self.velocidade_y += 1
-        self.rect.y += self.velocidade_y  # aplicar a gravidade - mover verticalmente jogador
+        self.rect.y += self.velocidade_y
+
+
+        self.rect.x += self.velocidade_x 
+        if self.rect.x >=  150:
+            self.velocidade_x = 0
+            self.rect.x = 150
 
         self.chao = False
 
