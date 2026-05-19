@@ -562,6 +562,10 @@ def spawnar_veiculo(plataformas):
     for _ in range(10):
         novo_veiculo = Veiculo(plat_escolhida, img, numero)
         if not any(novo_veiculo.rect.colliderect(m.rect) for m in moedas):
+            # Remove pessoas que sobrepõem o veículo
+            for p in list(pessoas):
+                if novo_veiculo.rect.colliderect(p.rect):
+                    p.kill()
             return novo_veiculo
 
     return None
@@ -772,11 +776,13 @@ while game:
                 for plat in resultado:
                     todos_sprites.add(plat)
                     plataformas.add(plat)
+                    gerar_pessoa(plat)
                     gerar_moedas(plat)
                 ultima_plat = resultado[-1]
             else:
                 todos_sprites.add(resultado)
                 plataformas.add(resultado)
+                gerar_pessoa(resultado)
                 gerar_moedas(resultado)
                 ultima_plat = resultado
         else:
