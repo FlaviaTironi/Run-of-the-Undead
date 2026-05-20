@@ -95,6 +95,14 @@ moeda_coletada = pygame.transform.scale(moeda_coletada, (40, 40))
 
 plat3_img = pygame.transform.scale(plat3_img, (largura, altura))
 
+# ── Timer HUD ────────────────────────────────────────────────────────────────
+tempo_img      = pygame.image.load("assets/img/tempo.png").convert_alpha()
+tempo_img      = pygame.transform.scale(tempo_img, (320, 126))
+tempo_img_rect = tempo_img.get_rect(centerx=WIDTH // 2, y=8)
+font_timer     = pygame.font.SysFont("Courier New", 34, bold=True)
+tempo_inicio   = 0   # preenchido após a tela de início
+# ─────────────────────────────────────────────────────────────────────────────
+
 # ── Imagens das bombas ───────────────────────────────────────────────────────
 bomba_imgs = {
     "atomica":    (pygame.transform.scale(pygame.image.load("assets/img/atomica.png").convert_alpha(),    (100, 100)), 10),
@@ -245,6 +253,8 @@ while inicio_jogo:
 
     pygame.display.update()
 
+# Inicia o cronômetro só depois que o jogador clicou em Jogar
+tempo_inicio = pygame.time.get_ticks()
 
 #  CLASSE PLATAFORMA
 class Plataforma(pygame.sprite.Sprite):
@@ -1043,6 +1053,18 @@ while game:
     # Texto quantidade moedas
     qnt_moedas = font.render(str(coins), True, branco)
     window.blit(qnt_moedas, (170, 200))
+
+    # ── HUD Timer ────────────────────────────────────────────────────────────
+    elapsed_ms = pygame.time.get_ticks() - tempo_inicio
+    mins  = (elapsed_ms // 60000)
+    segs  = (elapsed_ms % 60000) // 1000
+    cents = (elapsed_ms % 1000)  // 10
+    window.blit(tempo_img, tempo_img_rect)
+    txt_timer = font_timer.render(f"{mins:02d}:{segs:02d}:{cents:02d}", True, (210, 180, 130))
+    txt_rect  = txt_timer.get_rect(center=(tempo_img_rect.centerx - 38,
+                                           tempo_img_rect.centery + 18))
+    window.blit(txt_timer, txt_rect)
+    # ─────────────────────────────────────────────────────────────────────────
 
     pygame.display.update()
 
