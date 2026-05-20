@@ -207,12 +207,12 @@ coins        = 0
 zombie_count = 1
 
 #  Tela de início 
-inicio_jogo        = True
-largura_botao      = 200
-botao_altura_b     = 60
+inicio_jogo = True
+largura_botao = 200
+botao_altura_b = 60
 centraliza_x_botao = WIDTH//2 - largura_botao//2
-y_botao            = HEIGHT//2 + 50 #deixar um pouco mais para baixo do centro
-botao_rect         = pygame.Rect(centraliza_x_botao, y_botao, largura_botao, botao_altura_b)
+y_botao = HEIGHT//2 + 50 #deixar um pouco mais para baixo do centro
+botao_rect = pygame.Rect(centraliza_x_botao, y_botao, largura_botao, botao_altura_b)
 
 while inicio_jogo:
     clock.tick(FPS)
@@ -254,11 +254,10 @@ class Plataforma(pygame.sprite.Sprite):
         self.rect.x = x  #posição x da plataforma
         self.rect.y = y #posição y da plataforma
         margem_esq, offset_y, corte = HITBOX_OFFSETS[id(self.image)]
-        self.hitbox = pygame.Rect(x + margem_esq, y + offset_y,
-                                  self.rect.width - corte, 50)
+        self.hitbox = pygame.Rect(x + margem_esq, y + offset_y, self.rect.width - corte, 50)
 
     def update(self):
-        self.rect.x   += velocidade_mundo  #mover a plataforma para a esquerda
+        self.rect.x += velocidade_mundo  #mover a plataforma para a esquerda
         self.hitbox.x += velocidade_mundo
         if self.rect.right < 0:  # se a imagem sair da tela, a remove
             self.kill()
@@ -713,10 +712,12 @@ class Jogador(pygame.sprite.Sprite):
                     self.velocidade_y = 0
                     self.chao = True
 
-            # Lateral: fica preso (empurrado junto com o veículo)
+            # Lateral: verifica se tem zumbis suficientes
             elif self.rect.colliderect(v.hitbox_lateral):
-                # Encosta na lateral esquerda do veículo
-                self.rect.right = v.hitbox_lateral.left
+                if zombie_count >= v.numero:
+                    pass  # tratado no loop principal
+                else:
+                    self.rect.right = v.hitbox_lateral.left
 
         # ── Game over por cair no buraco ──────────────────────────────────
         if self.rect.top > HEIGHT:
@@ -753,6 +754,24 @@ plataformas = pygame.sprite.Group()
 veiculos = pygame.sprite.Group()
 pessoas = pygame.sprite.Group()
 zumbis_extras = pygame.sprite.Group()  # grupo da horda
+
+def atualizar_fila_zumbis():
+    zordenados = sorted(zumbis_extras, key=lambda z: z.posicao_na_fila)
+    for i, z in enumerate(zordenados, start=1):
+        z.posicao_na_fila = i
+        z.delay_total = i * DELAY_PULO
+        z.rect.x = 150 - i * ESPACO_FILA
+
+def remover_ultimo_zumbi_extra():
+    global zombie_count
+    if len(zumbis_extras) == 0:
+        return
+
+    ultimo = max(zumbis_extras, key=lambda z: z.posicao_na_fila)
+    ultimo.kill()
+    zombie_count = max(1, zombie_count - 1)
+    atualizar_fila_zumbis()
+
 todos_sprites.add(player)
 
 
@@ -849,6 +868,8 @@ while game:
         caiu = z.update(plataformas, veiculos)
         if caiu:
             z.kill()
+            zombie_count = max(1, zombie_count - 1)
+            atualizar_fila_zumbis()
 
     # Colisão do player com pessoas → some a pessoa, adiciona zumbi extra
     pessoas_atingidas = pygame.sprite.spritecollide(player, pessoas, True)
@@ -857,6 +878,7 @@ while game:
         nova_posicao = len(zumbis_extras) + 1
         novo_z = ZumbiExtra(nova_posicao)
         zumbis_extras.add(novo_z)
+        atualizar_fila_zumbis()
 
     # Coleta de moedas
     moedas_coletadas = pygame.sprite.spritecollide(player, moedas, True)
@@ -868,13 +890,27 @@ while game:
     for bomba in bombas_atingidas:
         som_explosao.play()
         zombie_count -= bomba.dano
-        # Remove zumbis extras se zombie_count diminuiu
-        while len(zumbis_extras) >= zombie_count and len(zumbis_extras) > 0:
-            ultimo = list(zumbis_extras)[-1]
-            ultimo.kill()
+
+        while len(zumbis_extras) > max(0, zombie_count - 1):
+            remover_ultimo_zumbi_extra()
+
         if zombie_count <= 0:
             zombie_count = 0
             game_over = True
+
+    # Colisão com veículos — consome ou morre
+    for v in list(veiculos):
+        if player.rect.colliderect(v.hitbox_lateral):
+            if zombie_count >= v.numero:
+                # Consome o veículo!
+                zombie_count += v.numero  # ganha zombies igual ao número do veículo
+                # Adiciona zumbis extras
+                for _ in range(v.numero):
+                    nova_posicao = len(zumbis_extras) + 1
+                    novo_z = ZumbiExtra(nova_posicao)
+                    zumbis_extras.add(novo_z)
+                v.kill()  # remove o veículo
+            # Se não tem zombies suficientes, já está sendo empurrado pelo update
 
     # Atualiza moedas e bomba
     moedas.update()
