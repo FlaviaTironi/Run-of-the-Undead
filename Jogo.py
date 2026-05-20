@@ -7,7 +7,8 @@ pygame.init()
 pygame.mixer.init()                                    
 pygame.mixer.music.load("assets/snd/musica_fundo.mp3") 
 pygame.mixer.music.play(-1)
-som_explosao = pygame.mixer.Sound("assets/snd/Somexplosão.mp3")
+som_explosao      = pygame.mixer.Sound("assets/snd/Somexplosão.mp3")
+som_moeda_recebida = pygame.mixer.Sound("assets/snd/moeda_recebida.mp3")
 # pygame.mixer.init()                                    # ADICIONA
 # pygame.mixer.music.load("assets/snd/musica_fundo.mp3")
 # pygame.mixer.music.load("assets/snd/audiodegrito.mp3")             # ADICIONA
@@ -293,36 +294,52 @@ def criar_trio(plat_anterior):
 
 
 #  CLASSE MOEDA
+_proximo_grupo_id = 0   # contador global de grupos
+grupos_moedas     = {}  # {grupo_id: {'total': N, 'coletadas': 0}}
+
 class Moeda(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, grupo_id):
         pygame.sprite.Sprite.__init__(self)
-        self.image = moeda_coletada
-        self.rect  = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
+        self.image    = moeda_coletada
+        self.rect     = self.image.get_rect()
+        self.rect.x   = x
+        self.rect.y   = y
+        self.grupo_id = grupo_id  # a qual grupo pertence
 
     def update(self):
         self.rect.x += velocidade_mundo
         if self.rect.right < 0:
+            # saiu da tela sem ser coletada — remove do grupo para não travar
+            if self.grupo_id in grupos_moedas:
+                grupos_moedas[self.grupo_id]['total'] -= 1
+                if grupos_moedas[self.grupo_id]['total'] <= 0:
+                    del grupos_moedas[self.grupo_id]
             self.kill()
 
 
 def gerar_moedas(plat):
+    global _proximo_grupo_id
     if random.random() < 0.5:
         padrao = random.choice(['linha', 'arco', 'escada'])
         x_base = random.randint(plat.hitbox.left, plat.hitbox.right - 200)
         y_base = plat.hitbox.top - 160
+
+        # Registra o grupo antes de criar as moedas
+        gid = _proximo_grupo_id
+        _proximo_grupo_id += 1
+        grupos_moedas[gid] = {'total': 5, 'coletadas': 0}
+
         if padrao == 'linha':
             for i in range(5):
-                m = Moeda(x_base + i * 50, y_base)
+                m = Moeda(x_base + i * 50, y_base, gid)
                 moedas.add(m); todos_sprites.add(m)
         elif padrao == 'arco':
             for i, dy in enumerate([0, -60, -100, -60, 0]):
-                m = Moeda(x_base + i * 50, y_base + dy)
+                m = Moeda(x_base + i * 50, y_base + dy, gid)
                 moedas.add(m); todos_sprites.add(m)
         elif padrao == 'escada':
             for i in range(5):
-                m = Moeda(x_base + i * 50, y_base - i * 30)
+                m = Moeda(x_base + i * 50, y_base - i * 30, gid)
                 moedas.add(m); todos_sprites.add(m)
 
 
@@ -892,8 +909,15 @@ while game:
 
     # Coleta de moedas
     moedas_coletadas = pygame.sprite.spritecollide(player, moedas, True)
-    for _ in moedas_coletadas:
+    for m in moedas_coletadas:
         coins += 1
+        gid = m.grupo_id
+        if gid in grupos_moedas:
+            grupos_moedas[gid]['coletadas'] += 1
+            # Coletou todas as moedas do grupo → toca o som especial
+            if grupos_moedas[gid]['coletadas'] >= grupos_moedas[gid]['total']:
+                som_moeda_recebida.play()
+                del grupos_moedas[gid]
 
     # ── Colisão com bombas ── CORRIGIDO ──────────────────────────────────────
     # Player toca bomba
@@ -1023,4 +1047,3 @@ while game:
     pygame.display.update()
 
 pygame.quit()
- 
