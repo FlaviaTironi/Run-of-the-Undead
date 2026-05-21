@@ -1,6 +1,7 @@
 # Bibliotecas
 import pygame
 import random
+import os
 
 # Inicialização e música de fundo
 pygame.init()
@@ -126,7 +127,7 @@ VEICULOS_INFO = [
     ("submarino",   10,  330, 180),
     ("tanque",      12,  360, 180),
     ("jetsky",       2,  270, 165),
-    ("rover",        5,  300, 180),
+    ("rover",        1,  300, 180),
 ]
 
 veiculos_imgs = {}
@@ -214,6 +215,24 @@ def calcular_gap_seguro(plat_anterior):
 # Conteúdo quantidade
 coins        = 0
 zombie_count = 1
+
+# ── Recorde ──────────────────────────────────────────────────────────────────
+RECORD_FILE = "record.txt"
+
+def carregar_recorde():
+    if os.path.exists(RECORD_FILE):
+        try:
+            with open(RECORD_FILE, "r") as f:
+                return int(f.read().strip())
+        except:
+            pass
+    return 0
+
+def salvar_recorde(ms):
+    atual = carregar_recorde()
+    if ms > atual:
+        with open(RECORD_FILE, "w") as f:
+            f.write(str(ms))
 
 #  Tela de início 
 inicio_jogo = True
@@ -375,14 +394,14 @@ def gerar_bomba(plat):
         return
 
     # Escolhe bombas baseado no tamanho da horda
-    if zombie_count < 5:
+    if zombie_count < 10:
+        opcoes = ["explosivo2", "explosivos", "fronte"]
+    elif zombie_count < 15:
         opcoes = ["explosivo2", "explosivos", "fronte", "granada", "bomba"]
-    elif zombie_count < 10:
-        opcoes = ["bomba", "granada", "fronte", "explosivos", "barril", "atomica"]
     else:
-        opcoes = ["barril", "atomica", "foguete", "toxico"]
+        opcoes = ["bomba", "granada", "fronte", "explosivos", "barril", "atomica", "foguete", "toxico"]
 
-    if random.random() < 0.4:
+    if random.random() < 0.2:
         nome   = random.choice(opcoes)
         imagem, dano = bomba_imgs[nome]
         min_x  = plat.hitbox.left + 20
@@ -391,10 +410,14 @@ def gerar_bomba(plat):
             return
 
         # Tenta até 10 posições sem sobrepor veículos
-        for _ in range(10):
+        for _ in range(15):
             x = random.randint(min_x, max_x)
             nova_bomba = Bomba(x, plat.hitbox.top, imagem, dano)
-            if not any(nova_bomba.rect.colliderect(v.rect) for v in veiculos):
+            # Nunca sobrepõe veículos, pessoas ou outras bombas
+            sobrepos = any(nova_bomba.rect.colliderect(v.rect) for v in veiculos)
+            sobrepos = sobrepos or any(nova_bomba.rect.colliderect(p.rect) for p in pessoas)
+            sobrepos = sobrepos or any(nova_bomba.rect.colliderect(b.rect) for b in bombas)
+            if not sobrepos:
                 bombas.add(nova_bomba)
                 return
 
@@ -484,6 +507,8 @@ def gerar_pessoa(plat):
         colidiu = colidiu or any(nova.rect.colliderect(v.rect) for v in veiculos)
         # Verifica sobreposição com outras pessoas
         colidiu = colidiu or any(nova.rect.colliderect(p.rect) for p in pessoas)
+        # Verifica sobreposição com bombas
+        colidiu = colidiu or any(nova.rect.colliderect(b.rect) for b in bombas)
         # Verifica sobreposição com pessoas já geradas nesta rodada
         colidiu = colidiu or any(
             abs(nova.rect.centerx - x) < 90 for x in x_ocupados
@@ -496,6 +521,9 @@ def gerar_pessoa(plat):
 
 #  CLASSE VEÍCULO
 class Veiculo(pygame.sprite.Sprite):
+    # Frames sendo arrastado junto com os zumbis antes de sumir (~0.5s)
+    FRAMES_ARRASTO = 15
+
     def __init__(self, plataforma, img, numero):
         pygame.sprite.Sprite.__init__(self)
         self.image  = img
@@ -527,9 +555,28 @@ class Veiculo(pygame.sprite.Sprite):
             15                            # altura fina no topo
         )
 
+        self.sendo_comido = False
+        self.timer_comido = 0
+
         self._font = pygame.font.SysFont("Arial Black", 22, bold=True)
 
+    def iniciar_consumo(self):
+        """Ativa o arrasto: hitboxes somem, veículo se move com o mundo por pouco tempo."""
+        self.sendo_comido = True
+        self.timer_comido = 0
+        self.hitbox_lateral = pygame.Rect(0, 0, 0, 0)
+        self.hitbox_topo    = pygame.Rect(0, 0, 0, 0)
+
     def update(self):
+        if self.sendo_comido:
+            self.timer_comido += 1
+            # Cancela o movimento do mundo: fica parado na tela igual aos zumbis
+            # (os zumbis têm X fixo na tela, então o veículo precisa de X fixo também)
+            # Não move nada — posição de tela fixa = parece grudado nos zumbis
+            if self.timer_comido >= self.FRAMES_ARRASTO:
+                self.kill()
+            return
+
         dx = velocidade_mundo
         self.rect.x          += dx
         self.hitbox_lateral.x += dx
@@ -548,22 +595,8 @@ class Veiculo(pygame.sprite.Sprite):
             self.kill()
 
     def draw_badge(self, surface):
-        txt    = self._font.render(str(self.numero), True, (20, 20, 20))
-        tw, th = txt.get_size()
-        pad    = 6
-        bw, bh = tw + pad*2, th + pad*2
-        cx     = self.rect.centerx
-        cy     = self.rect.top - bh//2 - 4
-
-        sh = pygame.Surface((bw+2, bh+2), pygame.SRCALPHA)
-        pygame.draw.rect(sh, (0,0,0,100), sh.get_rect(), border_radius=8)
-        surface.blit(sh, (cx - bw//2 - 1, cy - bh//2 + 2))
-
-        badge = pygame.Surface((bw, bh), pygame.SRCALPHA)
-        pygame.draw.rect(badge, (255,210,0,230), badge.get_rect(), border_radius=8)
-        pygame.draw.rect(badge, (0,0,0,180),     badge.get_rect(), 2, border_radius=8)
-        badge.blit(txt, (pad, pad))
-        surface.blit(badge, (cx - bw//2, cy - bh//2))
+        # REMOVIDO: badge amarelo com número foi retirado — o número já aparece na imagem do veículo
+        pass
 
 
 def spawnar_veiculo(plataformas):
@@ -592,9 +625,13 @@ def spawnar_veiculo(plataformas):
         return None
 
     # Tenta até 10 posições sem sobrepor moedas
-    for _ in range(10):
+    for _ in range(15):
         novo_veiculo = Veiculo(plat_escolhida, img, numero)
-        if not any(novo_veiculo.rect.colliderect(m.rect) for m in moedas):
+        # Nunca sobrepõe moedas, pessoas ou bombas
+        sobrepos = any(novo_veiculo.rect.colliderect(m.rect) for m in moedas)
+        sobrepos = sobrepos or any(novo_veiculo.rect.colliderect(p.rect) for p in pessoas)
+        sobrepos = sobrepos or any(novo_veiculo.rect.colliderect(b.rect) for b in bombas)
+        if not sobrepos:
             # Remove pessoas que sobrepõem o veículo
             for p in list(pessoas):
                 if novo_veiculo.rect.colliderect(p.rect):
@@ -607,8 +644,8 @@ def spawnar_veiculo(plataformas):
 
 #  CLASSE ZUMBI EXTRA (segue o líder com delay)
 
-DELAY_PULO    = 8    # frames de delay entre cada zumbi na fila
-ESPACO_FILA   = 70  # pixels de espaço entre cada zumbi
+DELAY_PULO    = 2    # era 3 → um pouquinho menor
+ESPACO_FILA   = 40   # sobreposição na metade: zumbi tem 80px, passo de 40px
 
 class ZumbiExtra(pygame.sprite.Sprite):
     def __init__(self, posicao_na_fila):
@@ -662,9 +699,11 @@ class ZumbiExtra(pygame.sprite.Sprite):
         self.velocidade_y += 1
         self.rect.y       += self.velocidade_y
 
-        # Posição X: segue atrás do player com espaço fixo
-        x_alvo = 150 - self.posicao_na_fila * ESPACO_FILA
-        self.rect.x = x_alvo
+        # Posição X: líder empurra para direita se fila não couber toda na tela
+        n_fila  = len(zumbis_extras)
+        lider_x = max(150, n_fila * ESPACO_FILA)
+        x_alvo  = lider_x - self.posicao_na_fila * ESPACO_FILA
+        self.rect.x = max(0, x_alvo)
 
         self.chao = False
 
@@ -683,6 +722,16 @@ class ZumbiExtra(pygame.sprite.Sprite):
                     self.rect.bottom = v.hitbox_topo.top
                     self.velocidade_y = 0
                     self.chao = True
+
+        # Colisão lateral com veículo — fica preso atrás enquanto não for destruído
+        for v in veiculos:
+            if not v.sendo_comido and self.rect.colliderect(v.hitbox_lateral):
+                self.rect.right = v.hitbox_lateral.left
+                self.velocidade_y = max(0, self.velocidade_y)
+                # CORRIGIDO: se o zumbi está preso lateralmente e o veículo avança sobre ele
+                # (rect.right chegou a 0 ou saiu da tela pela esquerda), ele morre
+                if self.rect.right <= 0:
+                    return True  # sinaliza morte para o loop principal
 
         # Cai no buraco → game over (tratado no loop principal)
         if self.rect.top > HEIGHT:
@@ -723,10 +772,12 @@ class Jogador(pygame.sprite.Sprite):
         self.velocidade_y += 1
         self.rect.y += self.velocidade_y
 
-        self.rect.x += self.velocidade_x 
-        if self.rect.x >= 150:
+        # X do líder: empurra para direita se fila não couber na tela
+        lider_x = max(150, len(zumbis_extras) * ESPACO_FILA)
+        self.rect.x += self.velocidade_x
+        if self.rect.x >= lider_x:
             self.velocidade_x = 0
-            self.rect.x = 150
+            self.rect.x = lider_x
 
         self.chao = False
 
@@ -780,6 +831,81 @@ class Jogador(pygame.sprite.Sprite):
             z.soltar_pulo()
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  TELA DE GAME OVER — tempo decorrido, recorde, jogar de novo / sair
+# ══════════════════════════════════════════════════════════════════════════════
+def tela_game_over(elapsed_ms):
+    """Mostra game over e retorna True = jogar de novo, False = sair."""
+    salvar_recorde(elapsed_ms)
+    recorde_ms = carregar_recorde()
+
+    fonte_grande = pygame.font.SysFont(None, 90)
+    fonte_media  = pygame.font.SysFont(None, 58)
+    fonte_botao  = pygame.font.SysFont(None, 62)
+
+    btn_w, btn_h = 420, 62
+    btn_replay = pygame.Rect(WIDTH//2 - btn_w//2, 618, btn_w, btn_h)
+    btn_sair   = pygame.Rect(WIDTH//2 - btn_w//2, 702, btn_w, btn_h)
+
+    esperando = True
+    resultado = False
+
+    while esperando:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mx, my = event.pos
+                if btn_replay.collidepoint(mx, my):
+                    resultado = True
+                    esperando = False
+                elif btn_sair.collidepoint(mx, my):
+                    resultado = False
+                    esperando = False
+
+        window.blit(gameover_img, (0, 0))
+
+        # ── Tempo desta partida ────────────────────────────────────────────
+        mins  = elapsed_ms // 60000
+        segs  = (elapsed_ms % 60000) // 1000
+        cents = (elapsed_ms % 1000)  // 10
+        txt_tempo = fonte_grande.render(f"{mins:02d}:{segs:02d}:{cents:02d}", True, branco)
+        window.blit(txt_tempo, txt_tempo.get_rect(center=(WIDTH//2, HEIGHT//2 - 55)))
+
+        # ── Recorde ────────────────────────────────────────────────────────
+        rm  = recorde_ms // 60000
+        rs  = (recorde_ms % 60000) // 1000
+        rc  = (recorde_ms % 1000)  // 10
+        txt_rec = fonte_media.render(f"Recorde: {rm:02d}:{rs:02d}:{rc:02d}", True, amarelo)
+        window.blit(txt_rec, txt_rec.get_rect(center=(WIDTH//2, HEIGHT//2 + 20)))
+
+        # ── Novo recorde ───────────────────────────────────────────────────
+        if elapsed_ms >= recorde_ms:
+            txt_nr = fonte_media.render("NOVO RECORDE!", True, (255, 120, 0))
+            window.blit(txt_nr, txt_nr.get_rect(center=(WIDTH//2, HEIGHT//2 + 78)))
+
+        # ── Botões ─────────────────────────────────────────────────────────
+        mouse_pos = pygame.mouse.get_pos()
+        cor_r = (0, 210, 0)   if btn_replay.collidepoint(mouse_pos) else verde
+        cor_s = (220, 30, 30) if btn_sair.collidepoint(mouse_pos)   else vermelho
+
+        pygame.draw.rect(window, cor_r, btn_replay, border_radius=12)
+        pygame.draw.rect(window, preto, btn_replay, 3, border_radius=12)
+        txt_r = fonte_botao.render("Jogar Novamente", True, branco)
+        window.blit(txt_r, txt_r.get_rect(center=btn_replay.center))
+
+        pygame.draw.rect(window, cor_s, btn_sair, border_radius=12)
+        pygame.draw.rect(window, preto, btn_sair, 3, border_radius=12)
+        txt_s = fonte_botao.render("Sair", True, branco)
+        window.blit(txt_s, txt_s.get_rect(center=btn_sair.center))
+
+        pygame.display.update()
+
+    return resultado
+
+
 # Criar jogador + grupo sprites
 player = Jogador()
 todos_sprites = pygame.sprite.Group()
@@ -792,10 +918,14 @@ zumbis_extras = pygame.sprite.Group()  # grupo da horda
 
 def atualizar_fila_zumbis():
     zordenados = sorted(zumbis_extras, key=lambda z: z.posicao_na_fila)
+    n_fila  = len(zordenados)
+    lider_x = max(150, n_fila * ESPACO_FILA)
+    # Atualiza player para ficar na posição correta
+    player.rect.x = lider_x
     for i, z in enumerate(zordenados, start=1):
         z.posicao_na_fila = i
         z.delay_total = i * DELAY_PULO
-        z.rect.x = 150 - i * ESPACO_FILA
+        z.rect.x = max(0, lider_x - i * ESPACO_FILA)
 
 def remover_ultimo_zumbi_extra():
     global zombie_count
@@ -827,24 +957,80 @@ while x_final < WIDTH + 200:
             plataformas.add(plat)
             gerar_moedas(plat)
             gerar_pessoa(plat)
-            gerar_bomba(plat)          # ← CORRIGIDO
+            gerar_bomba(plat)       
         ultima_plat = resultado[-1]
     else:
         todos_sprites.add(resultado)
         plataformas.add(resultado)
         gerar_moedas(resultado)
         gerar_pessoa(resultado)
-        gerar_bomba(resultado)         # ← CORRIGIDO
+        gerar_bomba(resultado)       
         ultima_plat = resultado
     x_final = ultima_plat.hitbox.right
 
 timer_jogo      = 0
-DELAY_VEICULOS  = 5 * FPS
+DELAY_VEICULOS  = 3 * FPS   # começa a spawnar veículos mais cedo (era 5s)
 timer_spawn_vei = 0
-INTERVALO_SPAWN = FPS
+INTERVALO_SPAWN = FPS // 2  # spawna 2x mais rápido (era a cada 1s, agora cada 0.5s)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
 #  LOOP PRINCIPAL
+# ══════════════════════════════════════════════════════════════════════════════
+def reiniciar_jogo():
+    """Reinicia todas as variáveis globais para uma nova partida."""
+    global player, todos_sprites, moedas, bombas, plataformas, veiculos
+    global pessoas, zumbis_extras, ultima_plat, coins, zombie_count
+    global velocidade_mundo, timer_velocidade, timer_jogo, timer_spawn_vei
+    global background_rect, placas_rect, tempo_inicio
+    global _proximo_grupo_id, grupos_moedas
+
+    velocidade_mundo  = -4
+    timer_velocidade  = 0
+    timer_jogo        = 0
+    timer_spawn_vei   = 0
+    coins             = 0
+    zombie_count      = 1
+    _proximo_grupo_id = 0
+    grupos_moedas     = {}
+
+    player = Jogador()
+    todos_sprites = pygame.sprite.Group()
+    moedas        = pygame.sprite.Group()
+    bombas        = pygame.sprite.Group()
+    plataformas   = pygame.sprite.Group()
+    veiculos      = pygame.sprite.Group()
+    pessoas       = pygame.sprite.Group()
+    zumbis_extras = pygame.sprite.Group()
+
+    todos_sprites.add(player)
+
+    plat_ini = Plataforma(0, chao, rua_img)
+    plat_ini.hitbox = pygame.Rect(0, chao + 220, largura, 50)
+    todos_sprites.add(plat_ini)
+    plataformas.add(plat_ini)
+
+    ultima_plat = plat_ini
+    x_f = plat_ini.hitbox.right
+    while x_f < WIDTH + 200:
+        res = criar_proxima_plataforma(ultima_plat)
+        if isinstance(res, tuple):
+            for p in res:
+                todos_sprites.add(p); plataformas.add(p)
+                gerar_moedas(p); gerar_pessoa(p); gerar_bomba(p)
+            ultima_plat = res[-1]
+        else:
+            todos_sprites.add(res); plataformas.add(res)
+            gerar_moedas(res); gerar_pessoa(res); gerar_bomba(res)
+            ultima_plat = res
+        x_f = ultima_plat.hitbox.right
+
+    background_rect = background.get_rect()
+    placas_rect     = placas_img.get_rect()
+    placas_rect.y   = 130
+    tempo_inicio    = pygame.time.get_ticks()
+
+
 while game:
     clock.tick(FPS)
 
@@ -880,9 +1066,9 @@ while game:
     if placas_rect.right < 0:
         placas_rect.x = 0
 
-    #Aumentando a velocidade do mapa a cada 10 segundos (10*60 = 600 frames)
+    #Aumentando a velocidade do mapa a cada 30 segundos (30*60 = 1800 frames) — CORRIGIDO: era 10s, agora aumenta mais devagar
     timer_velocidade += 1
-    if timer_velocidade >= 600:
+    if timer_velocidade >= 1800:
         timer_velocidade = 0
         if velocidade_mundo > velocidade_max:
             velocidade_mundo -= 1
@@ -890,10 +1076,14 @@ while game:
     # Atualiza jogador passando veículos também
     game_over = player.update(plataformas, veiculos, pessoas)
     if game_over:
-        window.blit(gameover_img, (0, 0))
-        pygame.display.update()
-        pygame.time.wait(3000)
-        game = False
+        elapsed = pygame.time.get_ticks() - tempo_inicio
+        jogar_de_novo = tela_game_over(elapsed)
+        if jogar_de_novo:
+            reiniciar_jogo()
+            continue
+        else:
+            game = False
+            break
 
     # Atualiza plat, veiculo e pessoas
     plataformas.update()
@@ -934,10 +1124,16 @@ while game:
     bombas_atingidas = pygame.sprite.spritecollide(player, bombas, True)
     for bomba in bombas_atingidas:
         som_explosao.play()
-        zombie_count -= bomba.dano
-        while len(zumbis_extras) > max(0, zombie_count - 1):
+        # CORRIGIDO: remove exatamente 'dano' zumbis da fila, começando pelo último
+        # O zombie principal (líder) só morre se não restar nenhum zumbi na fila
+        dano_restante = bomba.dano
+        while dano_restante > 0 and len(zumbis_extras) > 0:
             remover_ultimo_zumbi_extra()
-        if zombie_count <= 0:
+            dano_restante -= 1
+        # Só desconta do zombie_count o dano que sobrou (caso não havia zumbis suficientes na fila)
+        # zombie_count já é atualizado dentro de remover_ultimo_zumbi_extra
+        # Se ainda sobrou dano e não há mais zumbis na fila, o líder morre
+        if dano_restante > 0:
             zombie_count = 0
             game_over = True
 
@@ -946,18 +1142,31 @@ while game:
         bombas_z = pygame.sprite.spritecollide(z, bombas, True)
         for bomba in bombas_z:
             som_explosao.play()
-            zombie_count -= bomba.dano
-            while len(zumbis_extras) > max(0, zombie_count - 1):
+            # CORRIGIDO: mesma lógica — remove 'dano' zumbis da fila do último para o primeiro
+            dano_restante = bomba.dano
+            while dano_restante > 0 and len(zumbis_extras) > 0:
                 remover_ultimo_zumbi_extra()
-            if zombie_count <= 0:
+                dano_restante -= 1
+            # Se sobrou dano e a fila está vazia, o líder morre
+            if dano_restante > 0:
                 zombie_count = 0
                 game_over = True
             break  # uma bomba por zumbi por frame
     # ─────────────────────────────────────────────────────────────────────────
 
+    if game_over:
+        elapsed = pygame.time.get_ticks() - tempo_inicio
+        jogar_de_novo = tela_game_over(elapsed)
+        if jogar_de_novo:
+            reiniciar_jogo()
+            continue
+        else:
+            game = False
+            break
+
     # Colisão com veículos — consome ou morre
     for v in list(veiculos):
-        if player.rect.colliderect(v.hitbox_lateral):
+        if not v.sendo_comido and player.rect.colliderect(v.hitbox_lateral):
             if zombie_count >= v.numero:
                 # Consome o veículo!
                 zombie_count += v.numero  # ganha zombies igual ao número do veículo
@@ -966,7 +1175,8 @@ while game:
                     nova_posicao = len(zumbis_extras) + 1
                     novo_z = ZumbiExtra(nova_posicao)
                     zumbis_extras.add(novo_z)
-                v.kill()  # remove o veículo
+                atualizar_fila_zumbis()
+                v.iniciar_consumo()   # ← barra "COMENDO X%" aparece, some ao completar
             # Se não tem zombies suficientes, já está sendo empurrado pelo update
 
     # Atualiza moedas e bomba
@@ -1034,6 +1244,7 @@ while game:
 
     for v in veiculos:
         window.blit(v.image, v.rect)
+        v.draw_badge(window)
 
     # 8. Zumbis extras (desenhados antes do líder para ficar atrás)
     for z in zumbis_extras:
